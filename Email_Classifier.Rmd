@@ -1,0 +1,80 @@
+---
+title: "DATA607 Project 4"
+author: "ODONNELL"
+date: "April 9, 2019"
+output: html_document
+---
+
+load the needed packages
+```{r}
+library(tm)
+library(stringr)
+library(ggplot2)
+library(caret)
+library(rpart)
+```
+
+importing the emails into a corpus
+```{r}
+ham_emails<-Corpus(DirSource(directory="easy_ham"))
+spam_emails<-Corpus(DirSource(directory="spam"))
+attributes(ham_emails)
+
+#summary(ham_emails)
+```
+
+As I am having difficulty with the corpus, let's turn
+the corpus into a dataframe..
+And, we will label each email spam or ham with a flag
+```{r}
+ham_emails_df <- data.frame(text = get("content", ham_emails))
+ham_emails_df$spam <- 'N'
+
+
+spam_emails_df <- data.frame(text = get("content", spam_emails))
+spam_emails_df$spam <- 'Y'
+```
+
+Now, let's pick out some important pieces of data in each ham email
+```{r}
+ham_emails_df$sender <- str_extract(ham_emails_df$text, "From[[:punct:]]{1}.{1,200}")
+ham_emails_df$recipient <- str_extract(ham_emails_df$text, "To[[:punct:]]{1}.{1,200}")
+ham_emails_df$subject <- str_extract(ham_emails_df$text, "Subject[[:punct:]]{1}.{1,200}")
+ham_emails_df$date <- str_extract(ham_emails_df$text, "Date[[:punct:]]{1}.{1,200}")
+```
+
+And, let's do the same for each spam email
+```{r}
+spam_emails_df$sender <- str_extract(spam_emails_df$text, "From[[:punct:]]{1}.{1,200}")
+spam_emails_df$recipient <- str_extract(spam_emails_df$text, "To[[:punct:]]{1}.{1,200}")
+spam_emails_df$subject <- str_extract(spam_emails_df$text, "Subject[[:punct:]]{1}.{1,200}")
+spam_emails_df$date <- str_extract(spam_emails_df$text, "Date[[:punct:]]{1}.{1,200}")
+```
+
+Now let's combine the dataframes!
+```{r}
+email_df <- rbind(ham_emails_df, spam_emails_df)
+email_df <- subset(email_df, select = -c(text))
+email_df <- email_df[complete.cases(email_df), ]
+```
+
+Sort our data into training and testing datasets
+```{r}
+intrain <- createDataPartition(y = email_df$spam, p= 0.7, list = FALSE)
+training <- email_df[intrain,]
+testing <- email_df[-intrain,]
+
+dim(training)
+dim(testing)
+```
+Fit a Decision tree with rpart
+```{r}
+fit<- rpart(spam ~ subject + sender + recipient,
+   method="class", data=training)
+
+printcp(fit)
+```
+predict the amount of spam vs ham!
+```{r}
+table(predict(fit, type = "class"))
+```
